@@ -43,6 +43,8 @@ class AnalysisState(TypedDict):
     
     # Metadata
     execution_log: Annotated[list, operator.add]
+    evaluation_metrics: Dict[str, Any]
+    trace: Dict[str, Any]
 
 
 class MultiAgentOrchestrator:
@@ -103,28 +105,36 @@ class MultiAgentOrchestrator:
         """Run technical analysis agent"""
         result = self.technical_agent.execute(state)
         state['technical_output'] = result
-        state['execution_log'] = [f"✅ Technical Agent: {result['signal']} ({result['strength']}/100)"]
+        logs = state.get('execution_log', [])
+        logs.append(f"✅ Technical Agent: {result['signal']} ({result['strength']}/100)")
+        state['execution_log'] = logs
         return state
     
     def _run_fundamental(self, state: AnalysisState) -> AnalysisState:
         """Run fundamental analysis agent"""
         result = self.fundamental_agent.execute(state)
         state['fundamental_output'] = result
-        state['execution_log'] = [f"✅ Fundamental Agent: {result['signal']} ({result['strength']}/100)"]
+        logs = state.get('execution_log', [])
+        logs.append(f"✅ Fundamental Agent: {result['signal']} ({result['strength']}/100)")
+        state['execution_log'] = logs
         return state
     
     def _run_market_context(self, state: AnalysisState) -> AnalysisState:
         """Run market context agent"""
         result = self.market_context_agent.execute(state)
         state['market_context_output'] = result
-        state['execution_log'] = [f"✅ Market Context Agent: {result['signal']} ({result['strength']}/100)"]
+        logs = state.get('execution_log', [])
+        logs.append(f"✅ Market Context Agent: {result['signal']} ({result['strength']}/100)")
+        state['execution_log'] = logs
         return state
     
     def _run_risk(self, state: AnalysisState) -> AnalysisState:
         """Run risk assessment agent"""
         result = self.risk_agent.execute(state)
         state['risk_output'] = result
-        state['execution_log'] = [f"✅ Risk Agent: {result['signal']} ({result['strength']}/100)"]
+        logs = state.get('execution_log', [])
+        logs.append(f"✅ Risk Agent: {result['signal']} ({result['strength']}/100)")
+        state['execution_log'] = logs
         return state
     
     def _aggregate_results(self, state: AnalysisState) -> AnalysisState:
@@ -184,6 +194,55 @@ class MultiAgentOrchestrator:
             recommendation = 'HOLD'
             logger.warning(f"⚠️ Low confidence ({confidence:.0f}%), downgrading to HOLD")
         
+        # Evaluation metrics
+        risk_level = risk.get('risk_level', 'UNKNOWN')
+        if risk_level == 'LOW':
+            risk_factor = 1.0
+        elif risk_level == 'MEDIUM':
+            risk_factor = 0.9
+        elif risk_level == 'HIGH':
+            risk_factor = 0.75
+        elif risk_level == 'VERY_HIGH':
+            risk_factor = 0.5
+        else:
+            risk_factor = 0.8
+        risk_adjusted_score = composite_score * risk_factor
+        evaluation_metrics = {
+            'technical_strength': tech['strength'],
+            'fundamental_strength': fund['strength'],
+            'risk_strength': risk['strength'],
+            'market_context_strength': market['strength'],
+            'composite_score': int(composite_score),
+            'confidence': int(confidence),
+            'risk_adjusted_score': int(risk_adjusted_score),
+            'risk_level': risk_level,
+            'risk_reward': risk['risk_reward'],
+            'position_size_pct': risk['position_size'],
+            'stop_loss_pct': risk['stop_loss_pct'],
+            'conflict_detected': conflict_detected,
+            'buy_signals': buy_signals,
+            'sell_signals': sell_signals
+        }
+        state['evaluation_metrics'] = evaluation_metrics
+        
+        # Trace block
+        timestamp = datetime.now().isoformat()
+        trace_id = f"{state['ticker']}-{timestamp}"
+        trace = {
+            'trace_id': trace_id,
+            'ticker': state['ticker'],
+            'strategy': state['strategy'],
+            'timestamp': timestamp,
+            'weights': self.weights,
+            'agent_outputs': {
+                'technical': tech,
+                'fundamental': fund,
+                'risk': risk,
+                'market_context': market
+            }
+        }
+        state['trace'] = trace
+        
         # Build final recommendation
         state['final_recommendation'] = {
             'recommendation': recommendation,
@@ -201,17 +260,22 @@ class MultiAgentOrchestrator:
             'targets': risk['targets'],
             'position_size': risk['position_size'],
             'risk_reward': risk['risk_reward'],
-            'risk_level': risk['risk_level'],
-            'timestamp': datetime.now().isoformat()
+            'risk_level': risk_level,
+            'timestamp': timestamp,
+            'trace_id': trace_id,
+            'evaluation_metrics': evaluation_metrics,
+            'trace': trace
         }
         
         state['composite_score'] = int(composite_score)
         state['confidence'] = int(confidence)
-        state['execution_log'] = [
+        logs = state.get('execution_log', [])
+        logs.extend([
             f"🎯 Final Recommendation: {recommendation}",
             f"📊 Composite Score: {composite_score:.0f}/100",
             f"🎲 Confidence: {confidence:.0f}%"
-        ]
+        ])
+        state['execution_log'] = logs
         
         return state
     

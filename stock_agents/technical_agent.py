@@ -7,6 +7,8 @@ from typing import Dict, Any
 from stock_agents.base_agent import BaseAgent
 from market_data_fetcher import MarketDataFetcher
 import logging
+import pandas as pd
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +40,15 @@ class TechnicalAgent(BaseAgent):
         
         if not market_data:
             raise ValueError(f"No market data available for {ticker}")
+
+        # Pull recent historical data for advanced diagnostics
+        history_df = self.fetcher.yahoo_prov.get_historical_data(ticker, period="6mo", interval="1d")
+        if history_df is None or history_df.empty:
+            raise ValueError(f"Unable to fetch historical data for {ticker}")
+        history_df.columns = [col.lower() for col in history_df.columns]
+
+        false_breakout, false_breakdown = self._detect_false_break_moves(history_df)
+        bullish_div, bearish_div = self._detect_rsi_divergence(history_df)
         
         # Extract technical metrics
         current_price = market_data['price']
@@ -69,6 +80,13 @@ class TechnicalAgent(BaseAgent):
         else:
             score += 10
             reasoning.append(f"RSI at {rsi:.1f} - neutral")
+
+        if bullish_div:
+            score += 8
+            reasoning.append("✅ Bullish RSI divergence detected")
+        if bearish_div:
+            score -= 8
+            reasoning.append("⚠️ Bearish RSI divergence detected")
         
         # Volume Analysis (0-15 points)
         if volume_ratio > 2.0:
@@ -110,6 +128,13 @@ class TechnicalAgent(BaseAgent):
         if order_blocks > 0:
             score += min(order_blocks * 2, 10)
             reasoning.append(f"✅ {order_blocks} order blocks identified")
+
+        if false_breakout:
+            score -= 10
+            reasoning.append("⚠️ Possible bull trap (false breakout above resistance)")
+        if false_breakdown:
+            score += 10
+            reasoning.append("✅ Bear trap (false breakdown) – potential short-cover rally")
         
         # Price momentum (0-15 points)
         price_change = market_data['change_pct']
@@ -156,6 +181,61 @@ class TechnicalAgent(BaseAgent):
                 'bias': bias,
                 'price_change': price_change,
                 'active_fvgs': active_fvgs,
-                'order_blocks': order_blocks
+                'order_blocks': order_blocks,
+                'false_breakout': false_breakout,
+                'false_breakdown': false_breakdown,
+                'bullish_rsi_divergence': bullish_div,
+                'bearish_rsi_divergence': bearish_div
             }
         }
+
+    def _detect_false_break_moves(self, df: pd.DataFrame) -> (bool, bool):
+        """Identify recent false breakout/breakdown events."""
+        window = min(30, len(df))
+        if window < 10:
+            return False, False
+        recent = df.tail(window)
+        close = recent['close'].values
+        highs = recent['high'].values
+        lows = recent['low'].values
+
+        prior_high = np.max(highs[:-2])
+        prior_low = np.min(lows[:-2])
+        prev_close = close[-2]
+        last_close = close[-1]
+
+        false_breakout = prev_close > prior_high and last_close < prior_high
+        false_breakdown = prev_close < prior_low and last_close > prior_low
+        return bool(false_breakout), bool(false_breakdown)
+
+    def _detect_rsi_divergence(self, df: pd.DataFrame) -> (bool, bool):
+        """Detect simple RSI divergences using recent swings."""
+        closes = df['close']
+        if len(closes) < 20:
+            return False, False
+
+        returns = closes.pct_change()
+        gain = returns.where(returns > 0, 0).rolling(14).mean()
+        loss = -returns.where(returns < 0, 0).rolling(14).mean()
+        rs = gain / loss
+        rsi_series = 100 - (100 / (1 + rs))
+
+        recent_window = 10
+        prior_window = 10
+        recent_prices = closes.iloc[-recent_window:]
+        prior_prices = closes.iloc[-(recent_window + prior_window):-recent_window]
+        recent_rsi = rsi_series.iloc[-recent_window:]
+        prior_rsi = rsi_series.iloc[-(recent_window + prior_window):-recent_window]
+
+        if prior_prices.empty or prior_rsi.empty:
+            return False, False
+
+        bullish_div = (
+            recent_prices.min() < prior_prices.min() and
+            recent_rsi.min() > prior_rsi.min()
+        )
+        bearish_div = (
+            recent_prices.max() > prior_prices.max() and
+            recent_rsi.max() < prior_rsi.max()
+        )
+        return bool(bullish_div), bool(bearish_div)

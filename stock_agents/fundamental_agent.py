@@ -48,6 +48,20 @@ class FundamentalAgent(BaseAgent):
         current_ratio = fundamental_data.get('current_ratio', 1)
         profit_margin = fundamental_data.get('profit_margin', 0)
         quality_score = fundamental_data.get('overall_quality', 50)
+        dividend_yield = fundamental_data.get('dividend_yield', 0)
+        payout_ratio = fundamental_data.get('payout_ratio', 0)
+        free_cashflow = fundamental_data.get('free_cashflow', 0)
+        peg_ratio = fundamental_data.get('peg_ratio', 0)
+        fifty_two_week_high = fundamental_data.get('fifty_two_week_high', 0)
+        fifty_two_week_low = fundamental_data.get('fifty_two_week_low', 0)
+        quality_scores = fundamental_data.get('quality_scores', {})
+        profitability_q = quality_scores.get('Profitability', 0)
+        growth_q = quality_scores.get('Growth', 0)
+        leverage_q = quality_scores.get('Leverage', 0)
+        valuation_q = quality_scores.get('Valuation', 0)
+        dividend_q = quality_scores.get('Dividend', 0)
+        analyst_reco = fundamental_data.get('recommendation', 'none')
+        analyst_count = fundamental_data.get('number_of_analyst_opinions', 0)
         
         # Scoring logic
         score = 0
@@ -143,16 +157,109 @@ class FundamentalAgent(BaseAgent):
         # Profitability (0-10 points)
         if profit_margin > 15:
             score += 10
-            reasoning.append(f"✅ High profit margin {profit_margin:.1f}%")
+            reasoning.append(f" High profit margin {profit_margin:.1f}%")
         elif profit_margin > 10:
             score += 7
-            reasoning.append(f"✅ Good profit margin {profit_margin:.1f}%")
+            reasoning.append(f" Good profit margin {profit_margin:.1f}%")
         elif profit_margin > 5:
             score += 5
             reasoning.append(f"Moderate profit margin {profit_margin:.1f}%")
         elif profit_margin < 0:
             score -= 10
-            reasoning.append(f"⚠️ Negative profit margin {profit_margin:.1f}%")
+            reasoning.append(f" Negative profit margin {profit_margin:.1f}%")
+
+        # --- Value Investing Layer (growth- and PEG-aware) ---
+        value_score = 0
+        high_growth = (revenue_growth > 20) or (earnings_growth > 20)
+
+        # Moat / resilience proxies
+        if profitability_q >= 70:
+            value_score += 12
+            reasoning.append("\u0008\u0008 Strong profitability suggests durable moat")
+        elif 0 < profitability_q <= 40:
+            value_score -= 5
+            reasoning.append("\u0008\u0008 Weak profitability limits competitive advantage")
+
+        if leverage_q >= 80:
+            value_score += 5
+            reasoning.append("\u0008\u0008 Balance sheet strength supports resilience")
+        elif leverage_q <= 60 and debt_to_equity > 1.5:
+            value_score -= 5
+            reasoning.append("\u0008\u0008 Higher leverage increases downside risk")
+
+        if quality_score >= 80:
+            value_score += 5
+            reasoning.append("\u0008\u0008 Overall quality aligns with high-grade franchise")
+        elif quality_score < 50:
+            value_score -= 5
+            reasoning.append("\u0008\u0008 Overall quality below value-investor comfort zone")
+
+        # Valuation: growth-adjusted
+        if pe_ratio > 0:
+            if high_growth:
+                # For fast-growing sectors, accept higher P/E before penalizing
+                if pe_ratio < 30:
+                    value_score += 4
+                    reasoning.append("\u0008\u0008 Growth supports P/E premium (fast-growing franchise)")
+                elif pe_ratio > 45 and (peg_ratio == 0 or peg_ratio > 2):
+                    value_score -= 8
+                    reasoning.append("\u0008\u0008 Very rich P/E not matched by PEG/growth")
+            else:
+                # Classic value thresholds for mature/slower sectors
+                if pe_ratio < 15:
+                    value_score += 8
+                    reasoning.append("\u0008\u0008 Margin of safety: P/E below 15")
+                elif pe_ratio > 35:
+                    value_score -= 8
+                    reasoning.append("\u0008\u0008 Rich P/E leaves little margin of safety")
+
+        # PEG awareness (when available)
+        if peg_ratio and peg_ratio > 0:
+            if peg_ratio <= 1.5:
+                value_score += 3
+                reasoning.append("\u0008\u0008 PEG ratio reasonable relative to growth")
+            elif peg_ratio > 2.5:
+                value_score -= 4
+                reasoning.append("\u0008\u0008 PEG ratio stretched; expectations high")
+
+        # Price-to-book – asset-heavy vs asset-light
+        if pb_ratio > 0:
+            if pb_ratio < 1:
+                value_score += 6
+                reasoning.append("\u0008\u0008 Trading below book value suggests potential value opportunity")
+            elif pb_ratio > 4:
+                value_score -= 4
+                reasoning.append("\u0008\u0008 High price-to-book implies elevated expectations")
+
+        # Contrarian value: low expectations, real earnings
+        if (
+            pe_ratio > 0
+            and pe_ratio < 12
+            and revenue_growth > 0
+            and earnings_growth > 0
+            and quality_score >= 60
+        ):
+            value_score += 8
+            reasoning.append("\u0008\u0008 Contrarian value: low P/E, positive growth, solid quality")
+
+        # Story-stock risk: very high P/E without earnings support
+        if pe_ratio > 45 and earnings_growth <= 0:
+            value_score -= 10
+            reasoning.append("\u0008\u0008 Story stock risk: very high P/E without earnings support")
+
+        # Cash generation & capital allocation
+        if free_cashflow and free_cashflow > 0:
+            value_score += 4
+            reasoning.append("\u0008\u0008 Positive free cash flow supports shareholder value")
+
+        if 0 < payout_ratio < 60:
+            value_score += 3
+            reasoning.append("\u0008\u0008 Balanced payout ratio indicates sensible capital allocation")
+        elif payout_ratio > 80:
+            value_score -= 4
+            reasoning.append("\u0008\u0008 Very high payout ratio may limit reinvestment capacity")
+        value_score = max(-20, min(20, value_score))
+        score += value_score
         
         # Quality Score (0-5 points)
         score += (quality_score / 100) * 5
@@ -189,6 +296,10 @@ class FundamentalAgent(BaseAgent):
                 'debt_to_equity': debt_to_equity,
                 'current_ratio': current_ratio,
                 'profit_margin': profit_margin,
-                'quality_score': quality_score
+                'quality_score': quality_score,
+                'dividend_yield': dividend_yield,
+                'payout_ratio': payout_ratio,
+                'free_cashflow': free_cashflow,
+                'value_investing_score': value_score
             }
         }
