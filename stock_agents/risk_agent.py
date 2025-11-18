@@ -5,6 +5,10 @@ Calculates position sizing, stop-loss, risk-reward, and portfolio correlation
 
 from typing import Dict, Any
 from stock_agents.base_agent import BaseAgent
+from commodity_data_fetcher import (
+    fetch_commodity_snapshot,
+    evaluate_sector_pressure,
+)
 import logging
 
 logger = logging.getLogger(__name__)
@@ -26,6 +30,7 @@ class RiskAgent(BaseAgent):
         
         market_data = state['market_data']
         fundamental_data = state.get('fundamental_data', {})
+        sector_name = fundamental_data.get('sector', 'Unknown')
         
         current_price = market_data['price']
         rsi = market_data['rsi']
@@ -113,6 +118,26 @@ class RiskAgent(BaseAgent):
             score -= 5
             reasoning.append(f"⚠️ Reversal risk - RSI at extreme {rsi:.1f}")
         
+        # Commodity headwinds/tailwinds
+        commodity_pressure = {}
+        try:
+            commodity_snapshots = fetch_commodity_snapshot()
+            commodity_pressure = evaluate_sector_pressure(sector_name, commodity_snapshots)
+            for commodity, status in commodity_pressure.items():
+                if status == 'HEADWIND':
+                    score -= 5
+                    reasoning.append(
+                        f"⚠️ Commodity headwind - {commodity} elevated for {sector_name}"
+                    )
+                elif status == 'TAILWIND':
+                    score += 3
+                    reasoning.append(
+                        f"✅ Commodity tailwind - {commodity} benign for {sector_name}"
+                    )
+        except Exception as exc:
+            reasoning.append(f"⚠️ Commodity feed unavailable: {exc}")
+            commodity_pressure = {}
+
         # Normalize score
         score = max(0, min(100, score))
         
@@ -152,6 +177,7 @@ class RiskAgent(BaseAgent):
             'metrics': {
                 'volatility': round(volatility * 100, 2),
                 'quality_score': quality_score,
-                'debt_to_equity': debt_to_equity
+                'debt_to_equity': debt_to_equity,
+                'commodity_pressure': commodity_pressure
             }
         }
