@@ -2,17 +2,25 @@
 
 **Date:** November 18, 2025  
 **Current Price:** ₹42.36  
+**IPO Price:** ₹76 (August 2024)
+**Return from IPO:** -44.3% 🔴
 **Recommendation:** STRONG_SELL / AVOID
 
 ---
 
-## 🚨 Critical Alert
+## 🚨 Critical Alert - IPO PERSPECTIVE
 
 **Multi-Agent Score:** 16/100  
 **Risk Level:** VERY HIGH  
-**Confidence:** 31%
+**Confidence:** 31%  
+**IPO Performance:** FAILED (-44.3% in 3.5 months)
 
 ⚠️ **This stock has severe fundamental issues. Proceed with extreme caution.**
+
+### 🔴 IPO Investor Alert
+- **If you bought in IPO:** You're down 44.3%
+- **Lock-in expired:** November 2024 (selling pressure active)
+- **Recommendation:** Consider exiting to cut losses
 
 ---
 
