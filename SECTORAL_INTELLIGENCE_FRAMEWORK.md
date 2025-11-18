@@ -336,9 +336,62 @@ Process steps: Understand structure → identify drivers → map macro sensitivi
 
 ---
 
-### Appendices (To Expand Next)
+### Appendices
 
-- **Appendix A:** Full macro impact matrices (rates, inflation, GDP, FX, crude, monsoon, capex)  
-- **Appendix B:** Detailed tailwind/headwind tables for all 14 sectors  
-- **Appendix C:** Sample dashboards & JSON schemas  
-- **Appendix D:** Backtesting methodology for sector rotation
+#### Appendix A – Macro Impact Matrices
+
+| Macro Driver | Bullish For | Bearish For | Monitoring Trigger |
+|--------------|------------|-------------|--------------------|
+| **Rates ↓** | Banks (credit demand), Autos, Realty, Capital Goods | NBFCs with ALM gaps (short term) | RBI stance shift, 10Y G-Sec < 6.8% |
+| **Rates ↑** | Deposit-heavy banks (NIM spike) | Autos/Realty (EMI shock), Infra (high leverage) | RBI hikes, MSF usage |
+| **Inflation ↑ (>6%)** | Metals (pricing power), Energy upstream | FMCG (input cost), Discretionary | CPI print, agri commodity futures |
+| **INR Depreciation** | IT, Pharma exporters, Auto exporters | OMCs, Airlines, Capital goods importers | USD/INR > 84, RBI FX intervention |
+| **Crude > $95** | ONGC, Oil India (realization) | Paints, Airlines, Chemicals | Brent curve, OPEC statements |
+| **Good Monsoon (>95% LPA)** | FMCG, Agrochem, 2W, Tractor, Rural banks | Irrigation pumps (less need) | IMD progress, reservoir levels |
+| **Govt Capex Surge** | Infra EPC, Cement, Capital Goods, Defense | Private capex laggards (opportunity cost) | Union Budget, NIP tracker |
+| **US Fed Dovish** | IT (client budgets), FII-sensitive sectors | USD borrowers (if INR strengthens too fast) | Fed dot plot, DXY < 100 |
+
+#### Appendix B – Tailwind / Headwind Tables (Snapshot FY25)
+
+| Sector | Tailwinds | Headwinds | Horizon |
+|--------|-----------|-----------|---------|
+| Banking & Financials | Credit CAGR 12-15%, mortgage boom, PSU consolidation, digital origination | RBI cap on unsecured, fintech competition, agri NPAs if monsoon fails | 6-24m |
+| IT Services | AI/GenAI demand, GCC expansion, attrition easing | US discretionary cuts, INR strength, wage inflation | 6-18m |
+| Auto & Components | EV subsidies, premiumization, export thrust, chip normalization | High EMIs, commodity swings, EV disruption risk | 6-24m |
+| Pharma & Healthcare | Domestic 8-10% growth, USFDA approvals, China+1 APIs, chronic disease demand | US price erosion, regulatory surveillance, R&D spend | 12-24m |
+| FMCG/Retail | Rural recovery, premiumization, quick commerce channels | Input inflation, private labels, rural stress if monsoon weak | 6-18m |
+| Infra/Capital Goods/Defense | ₹10L Cr+ capex, PLI, defense indigenization, export orders | Commodity volatility, execution delays, WC needs | 6-36m |
+| Energy & Renewables | RE auctions, storage/hydrogen pilots, stable crude, gas infra build-out | Subsidy risk, RE tariff compression, policy delays | 6-24m |
+| Metals & Mining | China stimulus possibility, India infra demand, protectionist duties | China property drag, global recession, energy cost | 3-18m |
+| Telecom/Media | Tariff hikes, data growth, OTT consolidation | High capex, AGR dues, content costs | 6-24m |
+| Hospitality/Travel | Revenge travel, domestic tourism, QSR expansion | Fuel costs, supply additions, macro slowdown | 6-18m |
+
+#### Appendix C – Dashboards & JSON Schemas
+
+1. **Macro Monitor Dashboard** – live table pulling RBI rate, CPI, GDP trackers, USD/INR, Brent, monsoon, Govt capex status. Threshold coloring (green/yellow/red) drives alerting.
+2. **Sector Ranking Dashboard** – columns: 1M/3M/6M relative returns, RSS slope, valuation vs 5Y average, tailwind/headwind count, recommended weight (OW/MW/UW).
+3. **Sector Intelligence JSON Schema** (for agents):
+```json
+{
+  "sector": "Banking",
+  "signal": "FAVORABLE",
+  "relative_strength_score": 72,
+  "sector_phase": "EARLY_UPCYCLE",
+  "tailwinds": [{"text": "Credit CAGR 15%", "type": "cyclical", "confidence": 0.8}],
+  "headwinds": [{"text": "RBI unsecured cap", "type": "policy", "confidence": 0.5}],
+  "macro_flags": ["Rates_Stable", "GDP_>7"],
+  "recommended_action": "OVERWEIGHT",
+  "priority_watch": ["RBI MPC Dec", "Monsoon update"]
+}
+```
+
+#### Appendix D – Backtesting Methodology
+
+1. **Objective:** quantify alpha from sector-rotation overlay vs passive Nifty.
+2. **Data:** Daily sector indices (NSE), macro triggers (RBI, CPI, GDP, USD/INR, crude), 2015‑2025 sample.
+3. **Strategy Rules:**
+   - Overweight top 3 sectors with RSS slope > 0 for 4 consecutive weeks and ≥2 positive tailwinds.
+   - Underweight/exit sectors with RSS slope < 0 for 4 weeks + ≥2 headwinds.
+   - Rebalance monthly; cap sector weight at 35%.
+4. **Metrics:** CAGR, max drawdown, hit ratio of rotations, information ratio vs Nifty.
+5. **Enhancements:** transaction costs (10 bps), stress scenarios (COVID crash, 2022 inflation spike), sensitivity to holding period.
