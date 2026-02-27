@@ -1,0 +1,35 @@
+# Web framework
+fastapi>=0.111.0
+uvicorn[standard]>=0.30.0
+python-multipart>=0.0.9
+
+# Settings
+pydantic>=2.7.0
+pydantic-settings>=2.3.0
+
+# HTTP
+httpx>=0.27.0
+
+# Data
+pandas>=2.2.0
+numpy>=1.26.0
+
+# Database
+aiosqlite>=0.20.0
+
+# Cache
+redis>=5.0.0
+
+# Scheduler
+APScheduler>=3.10.4
+
+# Zerodha (primary Indian data)
+kiteconnect>=5.0.1
+
+# FRED (US M2 supply)
+# fredapi>=0.5.1   # optional — we use the REST API directly via httpx
+
+# Dev / testing
+pytest>=8.2.0
+pytest-asyncio>=0.23.0
+httpx>=0.27.0
